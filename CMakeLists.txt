@@ -1,25 +1,36 @@
-cmake_minimum_required(VERSION 3.0)
-project(libalternatives)
+cmake_minimum_required(VERSION 3.8)
+project(libalternatives C)
 
 set(SOURCES
     src/libalternatives.c
-    src/parser.c
+    src/options_parser.c
+    src/config_parser.c
 )
 
 add_compile_options(-Wall -Wextra -Wpedantic)
 
+set_property(GLOBAL PROPERTY VERSION 0.0.1)
+
 add_library(alternatives SHARED ${SOURCES})
+set_property(TARGET alternatives PROPERTY SOVERSION 1)
 set_property(TARGET alternatives PROPERTY
-    ALTERNATIVES_PATH test)
-target_compile_definitions(alternatives PRIVATE
-    ALTERNATIVES_PATH="TEST"
-    CONFIG_DIR="TEST"
+    ETC_PATH test)
+target_compile_definitions(alternatives PUBLIC
+    ETC_PATH="/etc"
+    CONFIG_DIR="/usr/share/libalternatives"
+    CONFIG_FILENAME="libalternatives.conf"
 )
 
-add_library(test_alternatives STATIC ${SOURCES})
+# test library also contains utilities that will be tested
+add_library(test_alternatives STATIC
+    ${SOURCES}
+    src/utils/alternatives.c
+)
 target_compile_definitions(test_alternatives PRIVATE
-    ALTERNATIVES_PATH="${CMAKE_CURRENT_SOURCE_DIR}/test/test_config"
+    ETC_PATH="${CMAKE_CURRENT_SOURCE_DIR}/test"
     CONFIG_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test/test_defaults"
+    CONFIG_FILENAME="libalternatives.conf"
+    UNITTESTS=1
 )
 
 
@@ -27,7 +38,12 @@ target_compile_definitions(test_alternatives PRIVATE
 set_target_properties(alternatives PROPERTIES DEFINE_SYMBOL "")
 
 
-add_executable(units test/test.c test/parser_tests.c)
+add_executable(units
+    test/test.c
+    test/options_parser_tests.c
+    test/config_parser_tests.c
+    test/alternatives_tests.c
+)
 target_link_libraries(units PUBLIC cunit)
 target_link_libraries(units PUBLIC test_alternatives)
 set_property(TARGET test_alternatives alternatives PROPERTY C_STANDARD 99)
@@ -40,3 +56,17 @@ setup_target_for_coverage_lcov(
     EXCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/test/*
 )
 
+
+# utilities
+add_executable(libalternatives_default
+    src/utils/default_helper.c
+)
+target_link_libraries(libalternatives_default PUBLIC alternatives)
+set_property(TARGET libalternatives_default PROPERTY SKIP_BUILD_RPATH TRUE)
+
+add_executable(update_alternatives
+    src/utils/alternatives.c
+)
+target_link_libraries(update_alternatives PUBLIC alternatives)
+set_property(TARGET update_alternatives PROPERTY SKIP_BUILD_RPATH TRUE)
+set_target_properties(update_alternatives PROPERTIES OUTPUT_NAME alternatives)
